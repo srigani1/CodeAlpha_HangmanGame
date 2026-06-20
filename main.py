@@ -1,420 +1,231 @@
-import customtkinter as ctk
-from tkinter import messagebox
-from words import WORDS
+import streamlit as st
 import random
 
-ctk.set_appearance_mode("dark")
-ctk.set_default_color_theme("dark-blue")
+st.set_page_config(
+    page_title="Cyber Hangman",
+    page_icon="🎮",
+    layout="centered"
+)
 
-class HangmanGame:
+# ---------- CYBER STYLE ----------
+st.markdown("""
+<style>
+.stApp{
+    background: linear-gradient(135deg,#0B1020,#131A33);
+}
 
-    def __init__(self, root):
+.title{
+    text-align:center;
+    font-size:52px;
+    font-weight:bold;
+    color:#00FFFF;
+    text-shadow:0 0 15px #00FFFF;
+}
 
-        self.root = root
-        self.root.title("Cyber Hangman")
-        self.root.geometry("1100x800")
-        self.root.configure(fg_color="#0B1020")
+.score{
+    text-align:center;
+    color:#00FF99;
+    font-size:24px;
+    font-weight:bold;
+}
 
-        self.score = 0
+.word{
+    text-align:center;
+    font-size:48px;
+    font-weight:bold;
+    color:white;
+    letter-spacing:12px;
+    padding:20px;
+}
 
-        self.title_label = ctk.CTkLabel(
-            root,
-            text="⚔️ CYBER HANGMAN ⚔️",
-            font=("Arial", 34, "bold"),
-            text_color="#00FFFF"
-        )
-        self.title_label.pack(pady=15)
+.info{
+    text-align:center;
+    font-size:22px;
+    color:#FFD700;
+}
+</style>
+""", unsafe_allow_html=True)
 
-        self.score_label = ctk.CTkLabel(
-            root,
-            text="🏆 Score : 0",
-            font=("Arial", 22, "bold"),
-            text_color="#00FF99"
-        )
-        self.score_label.pack()
+# ---------- WORDS ----------
+WORDS = {
+    "Easy": [
+        "APPLE",
+        "HOUSE",
+        "TABLE",
+        "MUSIC",
+        "TIGER"
+    ],
+    "Medium": [
+        "PYTHON",
+        "SCIENCE",
+        "LAPTOP",
+        "NETWORK",
+        "GAMING"
+    ],
+    "Hard": [
+        "PROGRAMMING",
+        "DEVELOPMENT",
+        "CYBERSECURITY",
+        "INTELLIGENCE"
+    ]
+}
 
-        self.timer_label = ctk.CTkLabel(
-            root,
-            text="⏳ 60",
-            font=("Arial", 22, "bold"),
-            text_color="#FFD700"
-        )
-        self.timer_label.pack(pady=5)
+# ---------- STATE ----------
+if "score" not in st.session_state:
+    st.session_state.score = 0
 
-        self.difficulty = ctk.StringVar(value="Easy")
+if "difficulty" not in st.session_state:
+    st.session_state.difficulty = "Easy"
 
-        self.level_menu = ctk.CTkOptionMenu(
-            root,
-            values=["Easy", "Medium", "Hard"],
-            variable=self.difficulty,
-            command=self.change_level
-        )
-        self.level_menu.pack(pady=10)
+if "word" not in st.session_state:
+    st.session_state.word = random.choice(
+        WORDS["Easy"]
+    )
 
-        self.canvas = ctk.CTkCanvas(
-            root,
-            width=320,
-            height=300,
-            bg="#111827",
-            highlightthickness=0
-        )
-        self.canvas.pack(pady=10)
+if "guessed" not in st.session_state:
+    st.session_state.guessed = []
 
-        self.word_label = ctk.CTkLabel(
-            root,
-            text="",
-            font=("Consolas", 40, "bold"),
-            text_color="white"
-        )
-        self.word_label.pack(pady=15)
+if "lives" not in st.session_state:
+    st.session_state.lives = 6
 
-        self.attempt_label = ctk.CTkLabel(
-            root,
-            text="❤️ Lives Left : 6",
-            font=("Arial", 22, "bold")
-        )
-        self.attempt_label.pack()
+# ---------- NEW GAME ----------
+def new_game():
 
-        self.keyboard_frame = ctk.CTkFrame(
-            root,
-            fg_color="#151C32"
-        )
-        self.keyboard_frame.pack(pady=15)
+    st.session_state.word = random.choice(
+        WORDS[st.session_state.difficulty]
+    )
 
-        self.restart_btn = ctk.CTkButton(
-            root,
-            text="🔄 Restart Game",
-            command=self.restart_game,
-            height=45,
-            corner_radius=12
-        )
-        self.restart_btn.pack(pady=15)
+    st.session_state.guessed = []
 
-        self.create_keyboard()
+    st.session_state.lives = 6
 
-        self.root.bind("<Key>", self.keyboard_input)
+# ---------- HEADER ----------
+st.markdown(
+    '<div class="title">⚔️ CYBER HANGMAN ⚔️</div>',
+    unsafe_allow_html=True
+)
 
-        self.animate_title()
+st.markdown(
+    f'<div class="score">🏆 Score: {st.session_state.score}</div>',
+    unsafe_allow_html=True
+)
 
-        self.restart_game()
+# ---------- DIFFICULTY ----------
+difficulty = st.selectbox(
+    "🎯 Difficulty",
+    ["Easy","Medium","Hard"],
+    index=["Easy","Medium","Hard"].index(
+        st.session_state.difficulty
+    )
+)
 
-    def animate_title(self):
+if difficulty != st.session_state.difficulty:
+    st.session_state.difficulty = difficulty
+    new_game()
 
-        colors = [
-            "#00FFFF",
-            "#00FF99",
-            "#FFD700",
-            "#FF66CC",
-            "#FFFFFF"
-        ]
+# ---------- NEW GAME BUTTON ----------
+if st.button("🔄 New Game"):
+    new_game()
+    st.rerun()
 
-        current = self.title_label.cget("text_color")
+# ---------- WORD DISPLAY ----------
+display = ""
 
-        try:
-            idx = colors.index(current)
-            idx = (idx + 1) % len(colors)
-        except:
-            idx = 0
+for char in st.session_state.word:
 
-        self.title_label.configure(
-            text_color=colors[idx]
-        )
+    if char in st.session_state.guessed:
+        display += char + " "
+    else:
+        display += "_ "
 
-        self.root.after(
-            300,
-            self.animate_title
-        )
+st.markdown(
+    f'<div class="word">{display}</div>',
+    unsafe_allow_html=True
+)
 
-    def create_keyboard(self):
+# ---------- STATUS ----------
+st.progress(st.session_state.lives / 6)
 
-        self.buttons = {}
+if st.session_state.lives >= 4:
+    st.success(
+        f"❤️ Lives Left: {st.session_state.lives}"
+    )
 
-        letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+elif st.session_state.lives >= 2:
+    st.warning(
+        f"💛 Lives Left: {st.session_state.lives}"
+    )
 
-        row = 0
-        col = 0
+else:
+    st.error(
+        f"💀 Lives Left: {st.session_state.lives}"
+    )
 
-        for letter in letters:
+# ---------- ENTER TO GUESS ----------
+with st.form("guess_form"):
 
-            btn = ctk.CTkButton(
-                self.keyboard_frame,
-                text=letter,
-                width=55,
-                height=45,
-                corner_radius=12,
-                fg_color="#1E3A8A",
-                hover_color="#2563EB",
-                font=("Arial", 16, "bold"),
-                command=lambda l=letter:
-                self.guess_letter(l)
+    guess = st.text_input(
+        "⌨️ Type a letter and press ENTER",
+        max_chars=1
+    ).upper()
+
+    submitted = st.form_submit_button(
+        "Guess"
+    )
+
+if submitted and guess:
+
+    if guess.isalpha():
+
+        if guess not in st.session_state.guessed:
+
+            st.session_state.guessed.append(
+                guess
             )
 
-            btn.grid(
-                row=row,
-                column=col,
-                padx=4,
-                pady=4
-            )
+            if guess not in st.session_state.word:
 
-            self.buttons[letter] = btn
+                st.session_state.lives -= 1
 
-            col += 1
+    st.rerun()
 
-            if col == 7:
-                col = 0
-                row += 1
+# ---------- GUESSED LETTERS ----------
+st.markdown("### 🔤 Used Letters")
 
-    def keyboard_input(self, event):
-
-        letter = event.char.upper()
-
-        if letter.isalpha():
-
-            if letter in self.buttons:
-
-                if self.buttons[
-                    letter
-                ].cget("state") != "disabled":
-
-                    self.guess_letter(letter)
-
-    def change_level(self, value):
-        self.restart_game()
-
-    def restart_game(self):
-
-        self.word = random.choice(
-            WORDS[self.difficulty.get()]
-        ).upper()
-
-        self.guessed = []
-
-        self.wrong = 0
-
-        self.max_wrong = 6
-
-        self.time_left = 60
-
-        for btn in self.buttons.values():
-            btn.configure(state="normal")
-
-        self.draw_hangman()
-
-        self.update_word()
-
-        self.update_attempts()
-
-        self.update_timer()
-
-    def update_timer(self):
-
-        self.timer_label.configure(
-            text=f"⏳ {self.time_left}"
+if st.session_state.guessed:
+    st.write(
+        " • ".join(
+            sorted(st.session_state.guessed)
         )
+    )
 
-        if self.time_left > 0:
+# ---------- WIN ----------
+won = all(
+    letter in st.session_state.guessed
+    for letter in st.session_state.word
+)
 
-            self.time_left -= 1
+if won:
 
-            self.timer_job = self.root.after(
-                1000,
-                self.update_timer
-            )
+    st.balloons()
 
-        else:
+    st.success(
+        f"🏆 YOU WIN! Word: {st.session_state.word}"
+    )
 
-            messagebox.showerror(
-                "Time Up",
-                f"⏳ Time Over!\nWord was {self.word}"
-            )
+    st.session_state.score += 10
 
-            self.restart_game()
+    if st.button("🎮 Play Again"):
+        new_game()
+        st.rerun()
 
-    def update_word(self):
+# ---------- LOSE ----------
+if st.session_state.lives <= 0:
 
-        display = ""
+    st.error(
+        f"💀 GAME OVER! Word was {st.session_state.word}"
+    )
 
-        for ch in self.word:
-
-            if ch in self.guessed:
-                display += ch + " "
-            else:
-                display += "_ "
-
-        self.word_label.configure(
-            text=display
-        )
-
-    def update_attempts(self):
-
-        left = self.max_wrong - self.wrong
-
-        if left >= 4:
-            color = "#00FF99"
-        elif left >= 2:
-            color = "#FFD700"
-        else:
-            color = "#FF4444"
-
-        self.attempt_label.configure(
-            text=f"❤️ Lives Left : {left}",
-            text_color=color
-        )
-
-    def guess_letter(self, letter):
-
-        self.buttons[
-            letter
-        ].configure(
-            state="disabled"
-        )
-
-        if letter in self.word:
-
-            self.guessed.append(letter)
-
-        else:
-
-            self.wrong += 1
-
-            self.draw_hangman()
-
-        self.update_word()
-
-        self.update_attempts()
-
-        self.check_game()
-
-    def draw_hangman(self):
-
-        self.canvas.delete("all")
-
-        self.canvas.create_line(
-            50,250,220,250,
-            fill="white",
-            width=4
-        )
-
-        self.canvas.create_line(
-            100,250,100,40,
-            fill="white",
-            width=4
-        )
-
-        self.canvas.create_line(
-            100,40,200,40,
-            fill="white",
-            width=4
-        )
-
-        self.canvas.create_line(
-            200,40,200,70,
-            fill="white",
-            width=4
-        )
-
-        if self.wrong >= 1:
-            self.canvas.create_oval(
-                175,70,225,120,
-                outline="#FF4444",
-                width=4
-            )
-
-        if self.wrong >= 2:
-            self.canvas.create_line(
-                200,120,200,190,
-                fill="#FF4444",
-                width=4
-            )
-
-        if self.wrong >= 3:
-            self.canvas.create_line(
-                200,140,160,170,
-                fill="#FF4444",
-                width=4
-            )
-
-        if self.wrong >= 4:
-            self.canvas.create_line(
-                200,140,240,170,
-                fill="#FF4444",
-                width=4
-            )
-
-        if self.wrong >= 5:
-            self.canvas.create_line(
-                200,190,170,230,
-                fill="#FF4444",
-                width=4
-            )
-
-        if self.wrong >= 6:
-            self.canvas.create_line(
-                200,190,230,230,
-                fill="#FF4444",
-                width=4
-            )
-
-    def check_game(self):
-
-        won = True
-
-        for ch in self.word:
-
-            if ch not in self.guessed:
-                won = False
-
-        if won:
-
-            try:
-                self.root.after_cancel(
-                    self.timer_job
-                )
-            except:
-                pass
-
-            self.score += 10
-
-            self.score_label.configure(
-                text=f"🏆 Score : {self.score}"
-            )
-
-            self.word_label.configure(
-                text="🏆 YOU WIN 🏆",
-                text_color="#00FF99"
-            )
-
-            messagebox.showinfo(
-                "Winner",
-                f"🎉 Correct!\nWord: {self.word}"
-            )
-
-            self.restart_game()
-
-        elif self.wrong >= self.max_wrong:
-
-            try:
-                self.root.after_cancel(
-                    self.timer_job
-                )
-            except:
-                pass
-
-            self.word_label.configure(
-                text="💀 GAME OVER 💀",
-                text_color="#FF4444"
-            )
-
-            messagebox.showerror(
-                "Game Over",
-                f"Word was: {self.word}"
-            )
-
-            self.restart_game()
-
-
-root = ctk.CTk()
-
-app = HangmanGame(root)
-
-root.mainloop()
+    if st.button("🔄 Try Again"):
+        new_game()
+        st.rerun()
